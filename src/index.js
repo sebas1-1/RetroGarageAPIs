@@ -3,6 +3,8 @@ const express  = require('express');
 const cors     = require('cors');
 const clientes = require('./routes/clientes');
 const usuarios = require('./routes/usuarios');
+const servicios = require('./routes/servicios');
+const citas = require('./routes/citas');
 
 const app = express();
 
@@ -11,6 +13,8 @@ app.use(express.json());
 
 app.use('/api/clientes', clientes);
 app.use('/api/usuarios', usuarios);
+app.use('/api/servicios', servicios);
+app.use('/api/citas', citas);
 
 app.get('/health', (_, res) => res.json({ ok: true }));
 
