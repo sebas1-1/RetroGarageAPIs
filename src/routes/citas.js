@@ -2,10 +2,10 @@ const express = require('express');
 const router  = express.Router();
 const { getPool, sql } = require('../db');
 
-// GET /api/citas?buscar=...&estado=...
+// GET /api/citas?buscar=...&estado=...&fecha=...
 router.get('/', async (req, res) => {
   try {
-    const { buscar, estado } = req.query;
+    const { buscar, estado, fecha } = req.query;
     const pool = await getPool();
     const request = pool.request();
     let query = `
@@ -29,6 +29,10 @@ router.get('/', async (req, res) => {
     if (estado) {
       request.input('estado', sql.NVarChar, estado);
       query += ` AND c.estado = @estado`;
+    }
+    if (fecha) {
+      request.input('fechaFiltro', sql.Date, fecha);
+      query += ` AND CONVERT(DATE, c.fecha) = @fechaFiltro`;
     }
     query += ' ORDER BY c.fecha DESC, c.hora ASC';
     const result = await request.query(query);
