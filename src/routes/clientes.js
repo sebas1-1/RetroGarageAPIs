@@ -117,13 +117,13 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/clientes/:id 
+// DELETE /api/clientes/:id (soft delete)
 router.delete('/:id', async (req, res) => {
   try {
     const pool = await getPool();
     await pool.request()
       .input('id', sql.Int, req.params.id)
-      .query('DELETE FROM clientes WHERE id_cliente = @id');
+      .query('UPDATE clientes SET activo = 0 WHERE id_cliente = @id');
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
