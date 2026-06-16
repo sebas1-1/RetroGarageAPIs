@@ -136,13 +136,13 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/usuarios/:id — baja lógica
+// DELETE /api/usuarios/:id (soft delete)
 router.delete('/:id', async (req, res) => {
   try {
     const pool = await getPool();
     await pool.request()
       .input('id', sql.Int, req.params.id)
-      .query('DELETE FROM usuarios WHERE id_usuario = @id');
+      .query('UPDATE usuarios SET activo = 0 WHERE id_usuario = @id');
     res.json({ ok: true });
   } catch (err) {
     console.error(err);

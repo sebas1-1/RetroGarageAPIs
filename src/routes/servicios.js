@@ -116,7 +116,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/servicios/:id — baja lógica
+// DELETE /api/servicios/:id (soft delete)
 router.delete('/:id', async (req, res) => {
   try {
     const pool = await getPool();
