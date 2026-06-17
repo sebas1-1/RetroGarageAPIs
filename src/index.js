@@ -5,6 +5,8 @@ const clientes = require('./routes/clientes');
 const usuarios = require('./routes/usuarios');
 const servicios = require('./routes/servicios');
 const citas = require('./routes/citas');
+const categoriasRouter = require('./routes/categorias');
+
 
 const app = express();
 
@@ -15,6 +17,7 @@ app.use('/api/clientes', clientes);
 app.use('/api/usuarios', usuarios);
 app.use('/api/servicios', servicios);
 app.use('/api/citas', citas);
+app.use('/api/categorias', categoriasRouter);
 
 app.get('/health', (_, res) => res.json({ ok: true }));
 
