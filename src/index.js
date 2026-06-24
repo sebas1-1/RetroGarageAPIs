@@ -8,6 +8,7 @@ const citas = require('./routes/citas');
 const categoriasRouter = require('./routes/categorias');
 const productos = require('./routes/productos');
 const pagos = require('./routes/pagos');
+const autos = require('./routes/autos');
 
 
 const app = express();
@@ -22,6 +23,7 @@ app.use('/api/citas', citas);
 app.use('/api/categorias', categoriasRouter);
 app.use('/api/productos', productos);
 app.use('/api/pagos', pagos);
+app.use('/api/autos', autos);
 
 app.get('/health', (_, res) => res.json({ ok: true }));
 
