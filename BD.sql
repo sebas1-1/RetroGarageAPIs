@@ -94,9 +94,25 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+CREATE TABLE [dbo].[auditoria](
+	[id_auditoria] [int] IDENTITY(1,1) NOT NULL,
+	[id_usuario] [int] NOT NULL,
+	[movimiento] [nvarchar](255) NOT NULL,
+	[fecha_movimiento] [datetime] NOT NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[id_auditoria] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Objeto: Table [dbo].[autos] Fecha de script: 24/6/2026 11:04:07 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 CREATE TABLE [dbo].[autos](
 	[id_auto] [int] IDENTITY(1,1) NOT NULL,
-	[identificacion] [nvarchar](20) NULL,
+	[identificacion] [nvarchar](255) NULL,
 	[marca] [varchar](100) NULL,
 	[modelo] [varchar](100) NULL,
 	[anio] [varchar](100) NULL,
@@ -152,10 +168,10 @@ CREATE TABLE [dbo].[clientes](
 	[id_cliente] [int] IDENTITY(1,1) NOT NULL,
 	[nombre] [nvarchar](100) NOT NULL,
 	[apellido] [nvarchar](100) NOT NULL,
-	[identificacion] [nvarchar](20) NOT NULL,
+	[identificacion] [nvarchar](255) NOT NULL,
 	[fecha_nacimiento] [date] NULL,
-	[correo] [nvarchar](100) NULL,
-	[telefono] [nvarchar](20) NOT NULL,
+	[correo] [nvarchar](255) NULL,
+	[telefono] [nvarchar](255) NOT NULL,
 	[provincia] [nvarchar](100) NULL,
 	[canton] [nvarchar](100) NULL,
 	[notas] [nvarchar](500) NULL,
@@ -348,8 +364,8 @@ CREATE TABLE [dbo].[usuarios](
 	[id_usuario] [int] IDENTITY(1,1) NOT NULL,
 	[id_rol] [int] NOT NULL,
 	[nombre_completo] [nvarchar](100) NOT NULL,
-	[correo] [nvarchar](100) NOT NULL,
-	[telefono] [nvarchar](20) NULL,
+	[correo] [nvarchar](255) NOT NULL,
+	[telefono] [nvarchar](255) NULL,
 	[contrasena_hash] [nvarchar](255) NOT NULL,
 	[activo] [bit] NOT NULL,
 	[fecha_creacion] [datetime] NOT NULL,
@@ -411,6 +427,13 @@ GO
 ALTER TABLE [dbo].[usuarios] ADD  DEFAULT ((1)) FOR [activo]
 GO
 ALTER TABLE [dbo].[usuarios] ADD  DEFAULT (getdate()) FOR [fecha_creacion]
+GO
+ALTER TABLE [dbo].[auditoria] ADD  DEFAULT (getdate()) FOR [fecha_movimiento]
+GO
+ALTER TABLE [dbo].[auditoria]  WITH CHECK ADD  CONSTRAINT [FK_auditoria_usuario] FOREIGN KEY([id_usuario])
+REFERENCES [dbo].[usuarios] ([id_usuario])
+GO
+ALTER TABLE [dbo].[auditoria] CHECK CONSTRAINT [FK_auditoria_usuario]
 GO
 ALTER TABLE [dbo].[autos]  WITH CHECK ADD  CONSTRAINT [FK_autos_clientes] FOREIGN KEY([identificacion])
 REFERENCES [dbo].[clientes] ([identificacion])

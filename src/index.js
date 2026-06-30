@@ -9,12 +9,14 @@ const categoriasRouter = require('./routes/categorias');
 const productos = require('./routes/productos');
 const pagos = require('./routes/pagos');
 const autos = require('./routes/autos');
+const auditMiddleware = require('./audit');
 
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(auditMiddleware);
 
 app.use('/api/clientes', clientes);
 app.use('/api/usuarios', usuarios);
