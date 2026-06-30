@@ -1,26 +1,50 @@
 const express = require('express');
 const router  = express.Router();
 const { getPool, sql } = require('../db');
+const { decryptField, encryptField } = require('../security');
+
+const encryptCliente = (cliente) => ({
+  ...cliente,
+  identificacion: encryptField('cliente.identificacion', cliente.identificacion),
+  correo: encryptField('cliente.correo', cliente.correo),
+  telefono: encryptField('cliente.telefono', cliente.telefono),
+});
+
+const decryptCliente = (cliente) => ({
+  ...cliente,
+  identificacion: decryptField('cliente.identificacion', cliente.identificacion),
+  correo: decryptField('cliente.correo', cliente.correo),
+  telefono: decryptField('cliente.telefono', cliente.telefono),
+});
+
+const matchesClienteSearch = (cliente, buscar = '') => {
+  if (!buscar) return true;
+  const term = String(buscar).trim().toLowerCase();
+  return [
+    cliente.nombre,
+    cliente.apellido,
+    cliente.identificacion,
+    cliente.telefono,
+    cliente.correo,
+  ].some((value) => String(value || '').toLowerCase().includes(term));
+};
 
 // GET /api/clientes?buscar=...
 router.get('/', async (req, res) => {
   try {
     const { buscar } = req.query;
     const pool = await getPool();
-    const request = pool.request();
     let query = `
   SELECT id_cliente,nombre,apellido,identificacion,fecha_nacimiento,telefono,correo,provincia,canton,notas,fecha_registro
   FROM clientes
   WHERE activo = 1
 `;
-    if (buscar) {
-      request.input('buscar', sql.NVarChar, `%${buscar}%`);
-      query += ` AND (nombre LIKE @buscar OR apellido LIKE @buscar
-                   OR identificacion LIKE @buscar OR telefono LIKE @buscar)`;
-    }
     query += ' ORDER BY fecha_registro DESC';
-    const result = await request.query(query);
-    res.json(result.recordset);
+    const result = await pool.request().query(query);
+    const clientes = result.recordset
+      .map(decryptCliente)
+      .filter((cliente) => matchesClienteSearch(cliente, buscar));
+    res.json(clientes);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener clientes' });
@@ -36,7 +60,7 @@ router.get('/:id', async (req, res) => {
       .query('SELECT * FROM clientes WHERE id_cliente = @id AND activo = 1');
     if (!result.recordset.length)
       return res.status(404).json({ error: 'Cliente no encontrado' });
-    res.json(result.recordset[0]);
+    res.json(decryptCliente(result.recordset[0]));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener cliente' });
@@ -51,14 +75,15 @@ router.post('/', async (req, res) => {
     if (!nombre || !apellido || !identificacion || !telefono)
       return res.status(400).json({ error: 'Faltan campos obligatorios' });
 
+    const encrypted = encryptCliente({ identificacion, correo, telefono });
     const pool = await getPool();
     const result = await pool.request()
       .input('nombre',           sql.NVarChar, nombre)
       .input('apellido',         sql.NVarChar, apellido)
-      .input('identificacion',   sql.NVarChar, identificacion)
+      .input('identificacion',   sql.NVarChar, encrypted.identificacion)
       .input('fecha_nacimiento', sql.Date,     fecha_nacimiento || null)
-      .input('correo',           sql.NVarChar, correo || null)
-      .input('telefono',         sql.NVarChar, telefono)
+      .input('correo',           sql.NVarChar, encrypted.correo || null)
+      .input('telefono',         sql.NVarChar, encrypted.telefono)
       .input('provincia',        sql.NVarChar, provincia || null)
       .input('canton',           sql.NVarChar, canton || null)
       .input('notas',            sql.NVarChar, notas || null)
@@ -87,15 +112,16 @@ router.put('/:id', async (req, res) => {
     if (!nombre || !apellido || !identificacion || !telefono)
       return res.status(400).json({ error: 'Faltan campos obligatorios' });
 
+    const encrypted = encryptCliente({ identificacion, correo, telefono });
     const pool = await getPool();
     await pool.request()
       .input('id',               sql.Int,      req.params.id)
       .input('nombre',           sql.NVarChar, nombre)
       .input('apellido',         sql.NVarChar, apellido)
-      .input('identificacion',   sql.NVarChar, identificacion)
+      .input('identificacion',   sql.NVarChar, encrypted.identificacion)
       .input('fecha_nacimiento', sql.Date,     fecha_nacimiento || null)
-      .input('correo',           sql.NVarChar, correo || null)
-      .input('telefono',         sql.NVarChar, telefono)
+      .input('correo',           sql.NVarChar, encrypted.correo || null)
+      .input('telefono',         sql.NVarChar, encrypted.telefono)
       .input('provincia',        sql.NVarChar, provincia || null)
       .input('canton',           sql.NVarChar, canton || null)
       .input('notas',            sql.NVarChar, notas || null)

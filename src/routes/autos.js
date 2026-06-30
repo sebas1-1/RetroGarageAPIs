@@ -1,13 +1,21 @@
 const express = require('express');
 const router  = express.Router();
 const { getPool, sql } = require('../db');
+const { decryptField, encryptField } = require('../security');
 
-const normalizeAuto = (auto, identificacionFallback = '') => ({
-  identificacion: auto.identificacion || identificacionFallback,
+const normalizeAuto = (auto) => ({
   marca: auto.marca || null,
   modelo: auto.modelo || null,
   anio: auto.anio || null,
   placa: auto.placa || null,
+});
+
+const encryptIdentificacion = (identificacion) =>
+  encryptField('cliente.identificacion', identificacion);
+
+const decryptAuto = (auto) => ({
+  ...auto,
+  identificacion: decryptField('cliente.identificacion', auto.identificacion),
 });
 
 // GET /api/autos?identificacion=...
@@ -17,9 +25,10 @@ router.get('/', async (req, res) => {
     if (!identificacion)
       return res.status(400).json({ error: 'Identificación requerida' });
 
+    const encryptedIdentificacion = encryptIdentificacion(identificacion);
     const pool = await getPool();
     const result = await pool.request()
-      .input('identificacion', sql.NVarChar, identificacion)
+      .input('identificacion', sql.NVarChar, encryptedIdentificacion)
       .query(`
         SELECT id_auto, identificacion, marca, modelo, anio, placa
         FROM autos
@@ -27,7 +36,7 @@ router.get('/', async (req, res) => {
         ORDER BY id_auto ASC
       `);
 
-    res.json(result.recordset);
+    res.json(result.recordset.map(decryptAuto));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener autos' });
@@ -37,13 +46,15 @@ router.get('/', async (req, res) => {
 // POST /api/autos
 router.post('/', async (req, res) => {
   try {
-    const auto = normalizeAuto(req.body);
-    if (!auto.identificacion)
+    const { identificacion, ...rest } = req.body;
+    const auto = normalizeAuto(rest);
+    if (!identificacion)
       return res.status(400).json({ error: 'Identificación requerida' });
 
+    const encryptedIdentificacion = encryptIdentificacion(identificacion);
     const pool = await getPool();
     const result = await pool.request()
-      .input('identificacion', sql.NVarChar, auto.identificacion)
+      .input('identificacion', sql.NVarChar, encryptedIdentificacion)
       .input('marca',          sql.VarChar,  auto.marca)
       .input('modelo',         sql.VarChar,  auto.modelo)
       .input('anio',           sql.VarChar,  auto.anio)
@@ -66,6 +77,11 @@ router.put('/cliente/:identificacion', async (req, res) => {
   const { identificacion } = req.params;
   const autos = Array.isArray(req.body.autos) ? req.body.autos : [];
 
+  // SIEMPRE cifrar la identificación de la URL: nunca confiar en el campo
+  // "identificacion" que pueda venir dentro de cada item del array, porque
+  // el frontend lo recibe ya desencriptado (texto plano) desde el GET previo.
+  const encryptedIdentificacion = encryptIdentificacion(identificacion);
+
   try {
     const pool = await getPool();
     const transaction = new sql.Transaction(pool);
@@ -73,16 +89,16 @@ router.put('/cliente/:identificacion', async (req, res) => {
 
     try {
       await new sql.Request(transaction)
-        .input('identificacion', sql.NVarChar, identificacion)
+        .input('identificacion', sql.NVarChar, encryptedIdentificacion)
         .query('DELETE FROM autos WHERE identificacion = @identificacion');
 
       for (const item of autos) {
-        const auto = normalizeAuto(item, identificacion);
+        const auto = normalizeAuto(item);
         const tieneDatos = auto.marca || auto.modelo || auto.anio || auto.placa;
         if (!tieneDatos) continue;
 
         await new sql.Request(transaction)
-          .input('identificacion', sql.NVarChar, identificacion)
+          .input('identificacion', sql.NVarChar, encryptedIdentificacion)
           .input('marca',          sql.VarChar,  auto.marca)
           .input('modelo',         sql.VarChar,  auto.modelo)
           .input('anio',           sql.VarChar,  auto.anio)
