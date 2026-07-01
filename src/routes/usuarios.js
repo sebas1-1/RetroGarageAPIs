@@ -43,6 +43,50 @@ const generateRecoveryCode = () =>
 
 const OTP_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const pendingOtpChallenges = new Map();
+const LOGIN_MAX_FAILED_ATTEMPTS = 3;
+const LOGIN_LOCK_MS = 3 * 60 * 1000;
+const loginAttemptState = new Map();
+
+const getLoginAttemptKey = (usuario = '') => String(usuario).trim().toLowerCase();
+
+const getActiveLoginBlock = (key) => {
+  const state = loginAttemptState.get(key);
+  if (!state?.blockedUntil) return null;
+
+  if (state.blockedUntil <= Date.now()) {
+    loginAttemptState.delete(key);
+    return null;
+  }
+
+  return state.blockedUntil;
+};
+
+const buildLoginBlockPayload = (blockedUntil) => ({
+  error: 'Demasiados intentos fallidos. Intente nuevamente en 3 minutos.',
+  blockedUntil: new Date(blockedUntil).toISOString(),
+  remainingSeconds: Math.ceil((blockedUntil - Date.now()) / 1000),
+});
+
+const registerFailedLoginAttempt = (key) => {
+  const current = loginAttemptState.get(key);
+  const failedAttempts = (current?.failedAttempts || 0) + 1;
+
+  if (failedAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
+    const blockedUntil = Date.now() + LOGIN_LOCK_MS;
+    loginAttemptState.set(key, { failedAttempts: 0, blockedUntil });
+    return { blockedUntil, attemptsRemaining: 0 };
+  }
+
+  loginAttemptState.set(key, { failedAttempts, blockedUntil: null });
+  return {
+    blockedUntil: null,
+    attemptsRemaining: LOGIN_MAX_FAILED_ATTEMPTS - failedAttempts,
+  };
+};
+
+const clearLoginAttempts = (key) => {
+  loginAttemptState.delete(key);
+};
 
 const createOtpChallenge = (usuario, setupRequired = false) => {
   const tempToken = crypto.randomBytes(32).toString('hex');
@@ -253,6 +297,12 @@ router.post('/login', async (req, res) => {
     if (!usuario || !contrasena)
       return res.status(400).json({ error: 'Usuario y contraseña son obligatorios' });
 
+    const loginAttemptKey = getLoginAttemptKey(usuario);
+    const blockedUntil = getActiveLoginBlock(loginAttemptKey);
+    if (blockedUntil) {
+      return res.status(423).json(buildLoginBlockPayload(blockedUntil));
+    }
+
     const pool = await getPool();
     const result = await pool.request()
       .input('usuario', sql.NVarChar, usuario)
@@ -290,8 +340,20 @@ router.post('/login', async (req, res) => {
       );
     }
 
-    if (!usuarioEncontrado)
-      return res.status(401).json({ error: 'Credenciales inválidas' });
+    if (!usuarioEncontrado) {
+      const failedAttempt = registerFailedLoginAttempt(loginAttemptKey);
+      if (failedAttempt.blockedUntil) {
+        return res.status(423).json(buildLoginBlockPayload(failedAttempt.blockedUntil));
+      }
+
+      return res.status(401).json({
+        error: `Credenciales inválidas. Intentos restantes: ${failedAttempt.attemptsRemaining}`,
+        attemptsRemaining: failedAttempt.attemptsRemaining,
+      });
+    }
+
+    clearLoginAttempts(loginAttemptKey);
+
     if (!usuarioEncontrado.id_rol)
       return res.status(403).json({ error: 'Tu cuenta está pendiente de asignación de rol' });
 
