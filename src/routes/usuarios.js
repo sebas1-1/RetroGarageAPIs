@@ -1,11 +1,15 @@
 const express = require('express');
+const crypto = require('crypto');
 const router  = express.Router();
 const { getPool, sql } = require('../db');
 const { sendRecoveryCode } = require('../mail');
 const {
+  buildOtpAuthUrl,
   decryptField,
   encryptField,
+  generateOtpSecret,
   hashPassword,
+  verifyTotp,
   verifyPassword,
 } = require('../security');
 
@@ -37,6 +41,43 @@ const getUsernameErrors = (username = '') => {
 const generateRecoveryCode = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
 
+const OTP_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const pendingOtpChallenges = new Map();
+
+const createOtpChallenge = (usuario, setupRequired = false) => {
+  const tempToken = crypto.randomBytes(32).toString('hex');
+  pendingOtpChallenges.set(tempToken, {
+    id_usuario: usuario.id_usuario,
+    setupRequired,
+    expiresAt: Date.now() + OTP_CHALLENGE_TTL_MS,
+  });
+
+  const response = {
+    requiresOtp: true,
+    tempToken,
+    setupRequired,
+  };
+
+  if (setupRequired) {
+    const decrypted = decryptUsuario(usuario);
+    response.secret = usuario.otp_secret;
+    response.otpauthUrl = buildOtpAuthUrl({
+      account: decrypted.correo || decrypted.nombre_usuario || `usuario-${usuario.id_usuario}`,
+      secret: usuario.otp_secret,
+    });
+  }
+
+  return response;
+};
+
+const consumeOtpChallenge = (tempToken) => {
+  const challenge = pendingOtpChallenges.get(tempToken);
+  pendingOtpChallenges.delete(tempToken);
+
+  if (!challenge || challenge.expiresAt < Date.now()) return null;
+  return challenge;
+};
+
 const encryptUsuario = (usuario) => ({
   ...usuario,
   correo: encryptField('usuario.correo', usuario.correo),
@@ -50,7 +91,7 @@ const decryptUsuario = (usuario) => ({
 });
 
 const publicUsuario = (usuario) => {
-  const { contrasena_hash, ...safeUsuario } = decryptUsuario(usuario);
+  const { contrasena_hash, otp_secret, ...safeUsuario } = decryptUsuario(usuario);
   return safeUsuario;
 };
 
@@ -254,14 +295,76 @@ router.post('/login', async (req, res) => {
     if (!usuarioEncontrado.id_rol)
       return res.status(403).json({ error: 'Tu cuenta está pendiente de asignación de rol' });
 
-    await pool.request()
-      .input('id', sql.Int, usuarioEncontrado.id_usuario)
-      .query('UPDATE usuarios SET ultimo_acceso = GETDATE() WHERE id_usuario = @id');
+    if (!usuarioEncontrado.otp_secret) {
+      usuarioEncontrado.otp_secret = generateOtpSecret();
+      usuarioEncontrado.otp_habilitado = false;
 
-    res.json({ usuario: publicUsuario(usuarioEncontrado) });
+      await pool.request()
+        .input('id', sql.Int, usuarioEncontrado.id_usuario)
+        .input('otp_secret', sql.NVarChar, usuarioEncontrado.otp_secret)
+        .query(`
+          UPDATE usuarios
+          SET otp_secret = @otp_secret, otp_habilitado = 0
+          WHERE id_usuario = @id
+        `);
+    }
+
+    if (!usuarioEncontrado.otp_habilitado) {
+      return res.json(createOtpChallenge(usuarioEncontrado, true));
+    }
+
+    return res.json(createOtpChallenge(usuarioEncontrado, false));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al iniciar sesión' });
+  }
+});
+
+// POST /api/usuarios/login/otp
+router.post('/login/otp', async (req, res) => {
+  try {
+    const { tempToken, codigo } = req.body;
+    if (!tempToken || !codigo)
+      return res.status(400).json({ error: 'Código de verificación obligatorio' });
+
+    const challenge = consumeOtpChallenge(tempToken);
+    if (!challenge)
+      return res.status(400).json({ error: 'La verificación expiró. Inicie sesión nuevamente.' });
+
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('id', sql.Int, challenge.id_usuario)
+      .query(`
+        SELECT u.id_usuario, u.id_rol, r.nombre AS rol,
+               u.nombre_usuario, u.nombre_completo, u.correo, u.telefono,
+               u.contrasena_hash, u.activo, u.fecha_creacion, u.ultimo_acceso,
+               u.otp_secret, u.otp_habilitado
+        FROM usuarios u
+        LEFT JOIN roles r ON u.id_rol = r.id_rol
+        WHERE u.id_usuario = @id AND u.activo = 1
+      `);
+
+    const usuarioEncontrado = result.recordset[0];
+    if (!usuarioEncontrado || !usuarioEncontrado.otp_secret)
+      return res.status(401).json({ error: 'Verificación inválida' });
+
+    if (!verifyTotp(usuarioEncontrado.otp_secret, codigo))
+      return res.status(401).json({ error: 'Código de autenticación inválido' });
+
+    await pool.request()
+      .input('id', sql.Int, usuarioEncontrado.id_usuario)
+      .query(`
+        UPDATE usuarios
+        SET ultimo_acceso = GETDATE(), otp_habilitado = 1
+        WHERE id_usuario = @id
+      `);
+
+    usuarioEncontrado.otp_habilitado = true;
+    usuarioEncontrado.ultimo_acceso = new Date();
+    res.json({ usuario: publicUsuario(usuarioEncontrado) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al verificar código' });
   }
 });
 
