@@ -314,6 +314,8 @@ CREATE TABLE [dbo].[usuarios](
 	[nombre_usuario] [nvarchar](50) NULL,
 	[otp_secret] [nvarchar](100) NULL,
 	[otp_habilitado] [bit] NOT NULL,
+	[otp_retro_secret] [nvarchar](100) NULL,
+	[otp_retro_habilitado] [bit] NOT NULL,
 PRIMARY KEY CLUSTERED 
 (
 	[id_usuario] ASC
@@ -377,6 +379,8 @@ GO
 ALTER TABLE [dbo].[usuarios] ADD  DEFAULT (getdate()) FOR [fecha_creacion]
 GO
 ALTER TABLE [dbo].[usuarios] ADD  CONSTRAINT [DF_usuarios_otp_habilitado]  DEFAULT ((0)) FOR [otp_habilitado]
+GO
+ALTER TABLE [dbo].[usuarios] ADD  CONSTRAINT [DF_usuarios_otp_retro_habilitado]  DEFAULT ((0)) FOR [otp_retro_habilitado]
 GO
 
 -- ================================

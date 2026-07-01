@@ -88,27 +88,39 @@ const clearLoginAttempts = (key) => {
   loginAttemptState.delete(key);
 };
 
-const createOtpChallenge = (usuario, setupRequired = false) => {
+const createOtpChallenge = (usuario) => {
   const tempToken = crypto.randomBytes(32).toString('hex');
+  const decrypted = decryptUsuario(usuario);
+  const accountKey = decrypted.nombre_usuario || decrypted.correo || `usuario-${usuario.id_usuario}`;
+  const googleSetupRequired = !usuario.otp_habilitado;
+  const retroSetupRequired = !usuario.otp_retro_habilitado;
+
   pendingOtpChallenges.set(tempToken, {
     id_usuario: usuario.id_usuario,
-    setupRequired,
     expiresAt: Date.now() + OTP_CHALLENGE_TTL_MS,
   });
 
   const response = {
     requiresOtp: true,
     tempToken,
-    setupRequired,
+    setupRequired: googleSetupRequired || retroSetupRequired,
+    googleSetupRequired,
+    retroSetupRequired,
+    methods: ['google', 'retrogarage'],
+    accountKey,
+    accountLabel: decrypted.correo || decrypted.nombre_usuario || accountKey,
   };
 
-  if (setupRequired) {
-    const decrypted = decryptUsuario(usuario);
-    response.secret = usuario.otp_secret;
+  if (googleSetupRequired) {
+    response.googleSecret = usuario.otp_secret;
     response.otpauthUrl = buildOtpAuthUrl({
-      account: decrypted.correo || decrypted.nombre_usuario || `usuario-${usuario.id_usuario}`,
+      account: response.accountLabel,
       secret: usuario.otp_secret,
     });
+  }
+
+  if (retroSetupRequired) {
+    response.retroSecret = usuario.otp_retro_secret;
   }
 
   return response;
@@ -135,7 +147,7 @@ const decryptUsuario = (usuario) => ({
 });
 
 const publicUsuario = (usuario) => {
-  const { contrasena_hash, otp_secret, ...safeUsuario } = decryptUsuario(usuario);
+  const { contrasena_hash, otp_secret, otp_retro_secret, ...safeUsuario } = decryptUsuario(usuario);
   return safeUsuario;
 };
 
@@ -310,7 +322,7 @@ router.post('/login', async (req, res) => {
         SELECT u.id_usuario, u.id_rol, r.nombre AS rol,
                u.nombre_usuario, u.nombre_completo, u.correo, u.telefono,
                u.contrasena_hash, u.activo, u.fecha_creacion, u.ultimo_acceso,
-               u.otp_secret, u.otp_habilitado
+               u.otp_secret, u.otp_habilitado, u.otp_retro_secret, u.otp_retro_habilitado
         FROM usuarios u
         LEFT JOIN roles r ON u.id_rol = r.id_rol
         WHERE u.activo = 1
@@ -329,7 +341,7 @@ router.post('/login', async (req, res) => {
           SELECT u.id_usuario, u.id_rol, r.nombre AS rol,
                  u.nombre_usuario, u.nombre_completo, u.correo, u.telefono,
                  u.contrasena_hash, u.activo, u.fecha_creacion, u.ultimo_acceso,
-                 u.otp_secret, u.otp_habilitado
+                 u.otp_secret, u.otp_habilitado, u.otp_retro_secret, u.otp_retro_habilitado
           FROM usuarios u
           LEFT JOIN roles r ON u.id_rol = r.id_rol
           WHERE u.activo = 1 AND u.correo = @correo
@@ -371,11 +383,21 @@ router.post('/login', async (req, res) => {
         `);
     }
 
-    if (!usuarioEncontrado.otp_habilitado) {
-      return res.json(createOtpChallenge(usuarioEncontrado, true));
+    if (!usuarioEncontrado.otp_retro_secret) {
+      usuarioEncontrado.otp_retro_secret = generateOtpSecret();
+      usuarioEncontrado.otp_retro_habilitado = false;
+
+      await pool.request()
+        .input('id', sql.Int, usuarioEncontrado.id_usuario)
+        .input('otp_retro_secret', sql.NVarChar, usuarioEncontrado.otp_retro_secret)
+        .query(`
+          UPDATE usuarios
+          SET otp_retro_secret = @otp_retro_secret, otp_retro_habilitado = 0
+          WHERE id_usuario = @id
+        `);
     }
 
-    return res.json(createOtpChallenge(usuarioEncontrado, false));
+    return res.json(createOtpChallenge(usuarioEncontrado));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al iniciar sesión' });
@@ -385,7 +407,9 @@ router.post('/login', async (req, res) => {
 // POST /api/usuarios/login/otp
 router.post('/login/otp', async (req, res) => {
   try {
-    const { tempToken, codigo } = req.body;
+    const { tempToken, codigo, metodo = 'google' } = req.body;
+    if (!['google', 'retrogarage'].includes(metodo))
+      return res.status(400).json({ error: 'Método de autenticación inválido' });
     if (!tempToken || !codigo)
       return res.status(400).json({ error: 'Código de verificación obligatorio' });
 
@@ -400,28 +424,35 @@ router.post('/login/otp', async (req, res) => {
         SELECT u.id_usuario, u.id_rol, r.nombre AS rol,
                u.nombre_usuario, u.nombre_completo, u.correo, u.telefono,
                u.contrasena_hash, u.activo, u.fecha_creacion, u.ultimo_acceso,
-               u.otp_secret, u.otp_habilitado
+               u.otp_secret, u.otp_habilitado, u.otp_retro_secret, u.otp_retro_habilitado
         FROM usuarios u
         LEFT JOIN roles r ON u.id_rol = r.id_rol
         WHERE u.id_usuario = @id AND u.activo = 1
       `);
 
     const usuarioEncontrado = result.recordset[0];
-    if (!usuarioEncontrado || !usuarioEncontrado.otp_secret)
+    const otpSecret =
+      metodo === 'retrogarage'
+        ? usuarioEncontrado?.otp_retro_secret
+        : usuarioEncontrado?.otp_secret;
+    if (!usuarioEncontrado || !otpSecret)
       return res.status(401).json({ error: 'Verificación inválida' });
 
-    if (!verifyTotp(usuarioEncontrado.otp_secret, codigo))
+    if (!verifyTotp(otpSecret, codigo))
       return res.status(401).json({ error: 'Código de autenticación inválido' });
+
+    const enableColumn =
+      metodo === 'retrogarage' ? 'otp_retro_habilitado' : 'otp_habilitado';
 
     await pool.request()
       .input('id', sql.Int, usuarioEncontrado.id_usuario)
       .query(`
         UPDATE usuarios
-        SET ultimo_acceso = GETDATE(), otp_habilitado = 1
+        SET ultimo_acceso = GETDATE(), ${enableColumn} = 1
         WHERE id_usuario = @id
       `);
 
-    usuarioEncontrado.otp_habilitado = true;
+    usuarioEncontrado[enableColumn] = true;
     usuarioEncontrado.ultimo_acceso = new Date();
     res.json({ usuario: publicUsuario(usuarioEncontrado) });
   } catch (err) {
