@@ -1,95 +1,7 @@
-USE [master]
-GO
-/****** Objeto: Database [RetroGarage] Fecha de script: 24/6/2026 11:04:06 ******/
-CREATE DATABASE [RetroGarage]
- CONTAINMENT = NONE
- ON  PRIMARY 
-( NAME = N'RetroGarage', FILENAME = N'C:\Program Files\Microsoft SQL Server\MSSQL17.MSSQLSERVER\MSSQL\DATA\RetroGarage.mdf' , SIZE = 8192KB , MAXSIZE = UNLIMITED, FILEGROWTH = 65536KB )
- LOG ON 
-( NAME = N'RetroGarage_log', FILENAME = N'C:\Program Files\Microsoft SQL Server\MSSQL17.MSSQLSERVER\MSSQL\DATA\RetroGarage_log.ldf' , SIZE = 8192KB , MAXSIZE = 2048GB , FILEGROWTH = 65536KB )
- WITH CATALOG_COLLATION = DATABASE_DEFAULT, LEDGER = OFF
-GO
-ALTER DATABASE [RetroGarage] SET COMPATIBILITY_LEVEL = 170
-GO
-IF (1 = FULLTEXTSERVICEPROPERTY('IsFullTextInstalled'))
-begin
-EXEC [RetroGarage].[dbo].[sp_fulltext_database] @action = 'enable'
-end
-GO
-ALTER DATABASE [RetroGarage] SET ANSI_NULL_DEFAULT OFF 
-GO
-ALTER DATABASE [RetroGarage] SET ANSI_NULLS OFF 
-GO
-ALTER DATABASE [RetroGarage] SET ANSI_PADDING OFF 
-GO
-ALTER DATABASE [RetroGarage] SET ANSI_WARNINGS OFF 
-GO
-ALTER DATABASE [RetroGarage] SET ARITHABORT OFF 
-GO
-ALTER DATABASE [RetroGarage] SET AUTO_CLOSE OFF 
-GO
-ALTER DATABASE [RetroGarage] SET AUTO_SHRINK OFF 
-GO
-ALTER DATABASE [RetroGarage] SET AUTO_UPDATE_STATISTICS ON 
-GO
-ALTER DATABASE [RetroGarage] SET CURSOR_CLOSE_ON_COMMIT OFF 
-GO
-ALTER DATABASE [RetroGarage] SET CURSOR_DEFAULT  GLOBAL 
-GO
-ALTER DATABASE [RetroGarage] SET CONCAT_NULL_YIELDS_NULL OFF 
-GO
-ALTER DATABASE [RetroGarage] SET NUMERIC_ROUNDABORT OFF 
-GO
-ALTER DATABASE [RetroGarage] SET QUOTED_IDENTIFIER OFF 
-GO
-ALTER DATABASE [RetroGarage] SET RECURSIVE_TRIGGERS OFF 
-GO
-ALTER DATABASE [RetroGarage] SET  ENABLE_BROKER 
-GO
-ALTER DATABASE [RetroGarage] SET AUTO_UPDATE_STATISTICS_ASYNC OFF 
-GO
-ALTER DATABASE [RetroGarage] SET DATE_CORRELATION_OPTIMIZATION OFF 
-GO
-ALTER DATABASE [RetroGarage] SET TRUSTWORTHY OFF 
-GO
-ALTER DATABASE [RetroGarage] SET ALLOW_SNAPSHOT_ISOLATION OFF 
-GO
-ALTER DATABASE [RetroGarage] SET PARAMETERIZATION SIMPLE 
-GO
-ALTER DATABASE [RetroGarage] SET READ_COMMITTED_SNAPSHOT OFF 
-GO
-ALTER DATABASE [RetroGarage] SET HONOR_BROKER_PRIORITY OFF 
-GO
-ALTER DATABASE [RetroGarage] SET RECOVERY FULL 
-GO
-ALTER DATABASE [RetroGarage] SET  MULTI_USER 
-GO
-ALTER DATABASE [RetroGarage] SET PAGE_VERIFY CHECKSUM  
-GO
-ALTER DATABASE [RetroGarage] SET DB_CHAINING OFF 
-GO
-ALTER DATABASE [RetroGarage] SET FILESTREAM( NON_TRANSACTED_ACCESS = OFF ) 
-GO
-ALTER DATABASE [RetroGarage] SET TARGET_RECOVERY_TIME = 60 SECONDS 
-GO
-ALTER DATABASE [RetroGarage] SET DELAYED_DURABILITY = DISABLED 
-GO
-ALTER DATABASE [RetroGarage] SET OPTIMIZED_LOCKING = OFF 
-GO
-ALTER DATABASE [RetroGarage] SET ACCELERATED_DATABASE_RECOVERY = OFF  
-GO
-ALTER DATABASE [RetroGarage] SET QUERY_STORE = ON
-GO
-ALTER DATABASE [RetroGarage] SET QUERY_STORE (OPERATION_MODE = READ_WRITE, CLEANUP_POLICY = (STALE_QUERY_THRESHOLD_DAYS = 30), DATA_FLUSH_INTERVAL_SECONDS = 900, INTERVAL_LENGTH_MINUTES = 60, MAX_STORAGE_SIZE_MB = 1000, QUERY_CAPTURE_MODE = AUTO, SIZE_BASED_CLEANUP_MODE = AUTO, MAX_PLANS_PER_QUERY = 200, WAIT_STATS_CAPTURE_MODE = ON)
-GO
 USE [RetroGarage]
 GO
-/****** Objeto: User [retro_user] Fecha de script: 24/6/2026 11:04:07 ******/
-CREATE USER [retro_user] FOR LOGIN [retro_user] WITH DEFAULT_SCHEMA=[dbo]
-GO
-ALTER ROLE [db_owner] ADD MEMBER [retro_user]
-GO
-/****** Objeto: Table [dbo].[autos] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: auditoria ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -97,15 +9,16 @@ GO
 CREATE TABLE [dbo].[auditoria](
 	[id_auditoria] [int] IDENTITY(1,1) NOT NULL,
 	[id_usuario] [int] NOT NULL,
-	[movimiento] [nvarchar](255) NOT NULL,
-	[fecha_movimiento] [datetime] NOT NULL,
-PRIMARY KEY CLUSTERED 
+	[movimiento] [varchar](300) NOT NULL,
+	[fecha_movimiento] [datetime] NULL,
+ CONSTRAINT [PK_auditoria] PRIMARY KEY CLUSTERED 
 (
 	[id_auditoria] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[autos] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: autos ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -119,7 +32,8 @@ CREATE TABLE [dbo].[autos](
 	[placa] [varchar](100) NULL
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[categorias] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: categorias ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -136,7 +50,8 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[citas] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: citas ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -159,7 +74,8 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[clientes] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: clientes ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -181,13 +97,14 @@ PRIMARY KEY CLUSTERED
 (
 	[id_cliente] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
-UNIQUE NONCLUSTERED 
+ CONSTRAINT [UQ_clientes_identificacion] UNIQUE NONCLUSTERED 
 (
 	[identificacion] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[metodos_pago] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: metodos_pago ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -203,7 +120,8 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[movimientos_inventario] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: movimientos_inventario ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -225,7 +143,8 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[pagos] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: pagos ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -254,7 +173,8 @@ UNIQUE NONCLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[productos] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: productos ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -281,7 +201,8 @@ UNIQUE NONCLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[recuperacion_contrasena] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: recuperacion_contrasena ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -300,7 +221,24 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[roles] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: RespuestaSeguridad ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[RespuestaSeguridad](
+	[nombre_usuario] [nvarchar](50) NOT NULL,
+	[Respuesta1] [varchar](50) NULL,
+	[Respuesta2] [varchar](50) NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[nombre_usuario] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+/****** Tabla: roles ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -315,7 +253,8 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[servicios] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: servicios ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -332,7 +271,8 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[sesiones_usuario] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: sesiones_usuario ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -355,14 +295,15 @@ UNIQUE NONCLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-/****** Objeto: Table [dbo].[usuarios] Fecha de script: 24/6/2026 11:04:07 ******/
+
+/****** Tabla: usuarios ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 CREATE TABLE [dbo].[usuarios](
 	[id_usuario] [int] IDENTITY(1,1) NOT NULL,
-	[id_rol] [int] NOT NULL,
+	[id_rol] [int] NULL,
 	[nombre_completo] [nvarchar](100) NOT NULL,
 	[correo] [nvarchar](255) NOT NULL,
 	[telefono] [nvarchar](255) NULL,
@@ -370,6 +311,9 @@ CREATE TABLE [dbo].[usuarios](
 	[activo] [bit] NOT NULL,
 	[fecha_creacion] [datetime] NOT NULL,
 	[ultimo_acceso] [datetime] NULL,
+	[nombre_usuario] [nvarchar](50) NULL,
+	[otp_secret] [nvarchar](100) NULL,
+	[otp_habilitado] [bit] NOT NULL,
 PRIMARY KEY CLUSTERED 
 (
 	[id_usuario] ASC
@@ -380,6 +324,10 @@ UNIQUE NONCLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
+
+-- ================================
+-- Valores por defecto (DEFAULT)
+-- ================================
 ALTER TABLE [dbo].[categorias] ADD  DEFAULT ((1)) FOR [activo]
 GO
 ALTER TABLE [dbo].[citas] ADD  DEFAULT ('PENDIENTE') FOR [estado]
@@ -428,15 +376,20 @@ ALTER TABLE [dbo].[usuarios] ADD  DEFAULT ((1)) FOR [activo]
 GO
 ALTER TABLE [dbo].[usuarios] ADD  DEFAULT (getdate()) FOR [fecha_creacion]
 GO
-ALTER TABLE [dbo].[auditoria] ADD  DEFAULT (getdate()) FOR [fecha_movimiento]
+ALTER TABLE [dbo].[usuarios] ADD  CONSTRAINT [DF_usuarios_otp_habilitado]  DEFAULT ((0)) FOR [otp_habilitado]
 GO
-ALTER TABLE [dbo].[auditoria]  WITH CHECK ADD  CONSTRAINT [FK_auditoria_usuario] FOREIGN KEY([id_usuario])
+
+-- ================================
+-- Llaves foráneas (FOREIGN KEY)
+-- ================================
+ALTER TABLE [dbo].[auditoria]  WITH NOCHECK ADD  CONSTRAINT [FK_usuarios_AUDITORIA] FOREIGN KEY([id_usuario])
 REFERENCES [dbo].[usuarios] ([id_usuario])
 GO
-ALTER TABLE [dbo].[auditoria] CHECK CONSTRAINT [FK_auditoria_usuario]
+ALTER TABLE [dbo].[auditoria] CHECK CONSTRAINT [FK_usuarios_AUDITORIA]
 GO
 ALTER TABLE [dbo].[autos]  WITH CHECK ADD  CONSTRAINT [FK_autos_clientes] FOREIGN KEY([identificacion])
 REFERENCES [dbo].[clientes] ([identificacion])
+ON UPDATE CASCADE
 GO
 ALTER TABLE [dbo].[autos] CHECK CONSTRAINT [FK_autos_clientes]
 GO
@@ -504,8 +457,4 @@ ALTER TABLE [dbo].[usuarios]  WITH CHECK ADD  CONSTRAINT [FK_usuarios_rol] FOREI
 REFERENCES [dbo].[roles] ([id_rol])
 GO
 ALTER TABLE [dbo].[usuarios] CHECK CONSTRAINT [FK_usuarios_rol]
-GO
-USE [master]
-GO
-ALTER DATABASE [RetroGarage] SET  READ_WRITE 
 GO
