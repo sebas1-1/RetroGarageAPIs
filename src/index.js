@@ -9,6 +9,7 @@ const categoriasRouter = require('./routes/categorias');
 const productos = require('./routes/productos');
 const pagos = require('./routes/pagos');
 const autos = require('./routes/autos');
+const geografia = require('./routes/geografia');
 const auditMiddleware = require('./audit');
 
 
@@ -26,6 +27,7 @@ app.use('/api/categorias', categoriasRouter);
 app.use('/api/productos', productos);
 app.use('/api/pagos', pagos);
 app.use('/api/autos', autos);
+app.use('/api/geografia', geografia);
 
 app.get('/health', (_, res) => res.json({ ok: true }));
 

@@ -35,9 +35,16 @@ router.get('/', async (req, res) => {
     const { buscar } = req.query;
     const pool = await getPool();
     let query = `
-  SELECT id_cliente,nombre,apellido,identificacion,fecha_nacimiento,telefono,correo,provincia,canton,notas,fecha_registro
-  FROM clientes
-  WHERE activo = 1
+  SELECT cl.id_cliente,cl.nombre,cl.apellido,cl.identificacion,cl.fecha_nacimiento,
+         cl.telefono,cl.correo,cl.id_distrito,cl.notas,cl.fecha_registro,
+         ca.id_canton, p.id_provincia, pa.id_pais, d.descripcion AS distrito,
+         ca.descripcion AS canton, p.descripcion AS provincia, pa.descripcion AS pais
+  FROM clientes cl
+  LEFT JOIN distritos d ON d.id_distrito = cl.id_distrito
+  LEFT JOIN cantones ca ON ca.id_canton = d.id_canton
+  LEFT JOIN provincias p ON p.id_provincia = ca.id_provincia
+  LEFT JOIN paises pa ON pa.id_pais = p.id_pais
+  WHERE cl.activo = 1
 `;
     query += ' ORDER BY fecha_registro DESC';
     const result = await pool.request().query(query);
@@ -57,7 +64,14 @@ router.get('/:id', async (req, res) => {
     const pool = await getPool();
     const result = await pool.request()
       .input('id', sql.Int, req.params.id)
-      .query('SELECT * FROM clientes WHERE id_cliente = @id AND activo = 1');
+      .query(`SELECT cl.*, ca.id_canton, p.id_provincia, pa.id_pais, d.descripcion AS distrito,
+                     ca.descripcion AS canton, p.descripcion AS provincia, pa.descripcion AS pais
+              FROM clientes cl
+              LEFT JOIN distritos d ON d.id_distrito = cl.id_distrito
+              LEFT JOIN cantones ca ON ca.id_canton = d.id_canton
+              LEFT JOIN provincias p ON p.id_provincia = ca.id_provincia
+              LEFT JOIN paises pa ON pa.id_pais = p.id_pais
+              WHERE cl.id_cliente = @id AND cl.activo = 1`);
     if (!result.recordset.length)
       return res.status(404).json({ error: 'Cliente no encontrado' });
     res.json(decryptCliente(result.recordset[0]));
@@ -71,7 +85,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { nombre, apellido, identificacion, fecha_nacimiento,
-            correo, telefono, provincia, canton, notas } = req.body;
+            correo, telefono, id_distrito, notas } = req.body;
     if (!nombre || !apellido || !identificacion || !telefono)
       return res.status(400).json({ error: 'Faltan campos obligatorios' });
 
@@ -84,16 +98,15 @@ router.post('/', async (req, res) => {
       .input('fecha_nacimiento', sql.Date,     fecha_nacimiento || null)
       .input('correo',           sql.NVarChar, encrypted.correo || null)
       .input('telefono',         sql.NVarChar, encrypted.telefono)
-      .input('provincia',        sql.NVarChar, provincia || null)
-      .input('canton',           sql.NVarChar, canton || null)
+      .input('id_distrito',      sql.Int,      id_distrito || null)
       .input('notas',            sql.NVarChar, notas || null)
       .query(`
         INSERT INTO clientes
           (nombre, apellido, identificacion, fecha_nacimiento,
-           correo, telefono, provincia, canton, notas)
+           correo, telefono, id_distrito, notas)
         OUTPUT INSERTED.id_cliente
         VALUES (@nombre, @apellido, @identificacion, @fecha_nacimiento,
-                @correo, @telefono, @provincia, @canton, @notas)
+                @correo, @telefono, @id_distrito, @notas)
       `);
     res.status(201).json({ id_cliente: result.recordset[0].id_cliente });
   } catch (err) {
@@ -108,7 +121,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { nombre, apellido, identificacion, fecha_nacimiento,
-            correo, telefono, provincia, canton, notas } = req.body;
+            correo, telefono, id_distrito, notas } = req.body;
     if (!nombre || !apellido || !identificacion || !telefono)
       return res.status(400).json({ error: 'Faltan campos obligatorios' });
 
@@ -122,8 +135,7 @@ router.put('/:id', async (req, res) => {
       .input('fecha_nacimiento', sql.Date,     fecha_nacimiento || null)
       .input('correo',           sql.NVarChar, encrypted.correo || null)
       .input('telefono',         sql.NVarChar, encrypted.telefono)
-      .input('provincia',        sql.NVarChar, provincia || null)
-      .input('canton',           sql.NVarChar, canton || null)
+      .input('id_distrito',      sql.Int,      id_distrito || null)
       .input('notas',            sql.NVarChar, notas || null)
       .query(`
         UPDATE clientes SET
@@ -131,7 +143,7 @@ router.put('/:id', async (req, res) => {
           identificacion = @identificacion,
           fecha_nacimiento = @fecha_nacimiento,
           correo = @correo, telefono = @telefono,
-          provincia = @provincia, canton = @canton, notas = @notas
+          id_distrito = @id_distrito, notas = @notas
         WHERE id_cliente = @id
       `);
     res.json({ ok: true });
