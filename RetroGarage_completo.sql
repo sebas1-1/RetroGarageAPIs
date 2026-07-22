@@ -1,3 +1,5 @@
+CREATE DATABASE [RetroGarage]
+GO
 USE [RetroGarage]
 GO
 
