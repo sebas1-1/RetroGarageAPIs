@@ -1,0 +1,217 @@
+============================================================
+RETRO GARAGE - DATOS PARA PRUEBAS MANUALES DE PAGOS
+============================================================
+
+Estos datos se escriben manualmente en la pantalla:
+http://localhost:8081/pagos/nuevo
+
+
+============================================================
+1. TARJETAS - PAGOS EXITOSOS
+============================================================
+
+VISA - Banco de Costa Rica
+Numero:     4111 1111 1111 1111
+Vence:      12/30
+CVV:        123
+Saldo actual aproximado: CRC 2 235 000
+
+MASTERCARD - Banco Nacional
+Numero:     5555 5555 5555 4444
+Vence:      12/30
+CVV:        456
+Saldo actual aproximado: CRC 1 655 000
+
+MASTERCARD - BAC Credomatic
+Numero:     2223 0000 4840 0011
+Vence:      12/30
+CVV:        789
+Saldo actual aproximado: CRC 1 500 000
+
+Resultado esperado:
+- Se genera una factura.
+- Se registra el pago como COMPLETADO.
+- Se descuenta el saldo de la tarjeta.
+- Si se compran productos, se descuenta el stock.
+- Si se paga una cita, la cita queda COMPLETADA.
+
+
+============================================================
+2. TARJETAS - PAGOS RECHAZADOS
+============================================================
+
+CASO A: CVV incorrecto
+Numero:     4111 1111 1111 1111
+Vence:      12/30
+CVV:        000
+
+Resultado esperado:
+PayPal no interviene. El banco rechaza la tarjeta porque el CVV
+no coincide. No se genera factura ni se descuenta stock.
+
+
+CASO B: Vencimiento incorrecto
+Numero:     5555 5555 5555 4444
+Vence:      11/30
+CVV:        456
+
+Resultado esperado:
+El banco rechaza la tarjeta porque el vencimiento no coincide.
+
+
+CASO C: Tarjeta no registrada
+Numero:     4000 0000 0000 0000
+Vence:      12/30
+CVV:        123
+
+Resultado esperado:
+La tarjeta tiene formato Visa, pero no existe en el banco.
+El pago debe ser rechazado.
+
+
+CASO D: Saldo insuficiente
+Numero:     2223 0000 4840 0011
+Vence:      12/30
+CVV:        789
+
+Para provocar el rechazo, intenta pagar un total superior al saldo
+actual de esa tarjeta.
+
+Resultado esperado:
+Saldo insuficiente. No se genera factura ni se descuenta stock.
+
+
+============================================================
+3. SINPE MOVIL - PAGOS EXITOSOS
+============================================================
+
+Banco de Costa Rica
+Telefono:   88887777
+Saldo actual aproximado: CRC 4 688 000
+
+Banco Nacional
+Telefono:   70001111
+Saldo actual aproximado: CRC 2 480 000
+
+BAC Credomatic
+Telefono:   60002222
+Saldo actual aproximado: CRC 1 500 000
+
+Resultado esperado:
+- Se genera una factura.
+- Se descuenta el saldo de la cuenta SINPE.
+- Se descuenta el stock cuando hay productos.
+- Se completa la cita cuando corresponde.
+
+
+============================================================
+4. SINPE MOVIL - PAGOS RECHAZADOS
+============================================================
+
+CASO A: Telefono no vinculado
+Telefono:   61111111
+
+Resultado esperado:
+El numero no esta vinculado a una cuenta SINPE y el pago se rechaza.
+
+
+CASO B: Saldo insuficiente
+Telefono:   60002222
+
+Para provocar el rechazo, intenta pagar un total superior al saldo
+actual de esa cuenta.
+
+Resultado esperado:
+Saldo insuficiente. No se genera factura ni se descuenta stock.
+
+
+CASO C: Numero incompleto
+Telefono:   8888777
+
+Resultado esperado:
+La pantalla no debe permitir registrar el pago porque faltan digitos.
+
+
+============================================================
+5. PAYPAL SANDBOX - PAGO EXITOSO
+============================================================
+
+Metodo: PayPal
+Cuenta: La cuenta de tipo Personal de Testing Tools > Sandbox Accounts
+
+Correo Sandbox:
+sb-gf44f52258369@personal.example.com
+
+Contrasena:
+Consultar en PayPal Developer:
+Testing Tools > Sandbox Accounts > cuenta Personal > View/Edit Account
+
+IMPORTANTE:
+- No usar la cuenta PayPal real.
+- No usar la cuenta Business para comprar.
+- La cuenta Personal compra y la Business recibe.
+- El total en colones se convierte a USD usando CRC 500 = USD 1.
+
+Pasos:
+1. Seleccionar PayPal.
+2. Presionar "Continuar con PayPal".
+3. Iniciar sesion con la cuenta Personal Sandbox.
+4. Aprobar la compra.
+
+Resultado esperado:
+- PayPal regresa a RetroGarage.
+- Se muestra "Pago confirmado".
+- Se genera una factura.
+- Se registra el monto original en colones y el monto PayPal en USD.
+- Se descuenta el stock o se completa la cita.
+
+
+============================================================
+6. PAYPAL SANDBOX - PAGO RECHAZADO
+============================================================
+
+El saldo visible de la cuenta Sandbox no siempre provoca un rechazo.
+Sandbox normalmente intenta completar los pagos correctamente.
+
+Para forzar manualmente un rechazo oficial:
+
+1. Abrir el archivo .env del backend.
+2. Cambiar esta linea:
+
+PAYPAL_SANDBOX_MOCK_ERROR=INSTRUMENT_DECLINED
+
+3. Reiniciar el backend.
+4. Crear una orden PayPal nueva.
+5. Iniciar sesion y aprobarla normalmente.
+
+Resultado esperado:
+PayPal rechazara la fuente de fondos.
+No se genera factura, no se descuenta stock y la orden queda FALLIDA.
+
+MUY IMPORTANTE:
+Despues de terminar la prueba, volver a dejar:
+
+PAYPAL_SANDBOX_MOCK_ERROR=
+
+Luego reiniciar nuevamente el backend para permitir pagos exitosos.
+
+
+============================================================
+7. COMPROBACIONES RAPIDAS
+============================================================
+
+PAGO EXITOSO:
+- Aparece en el historial de pagos.
+- Tiene numero de factura.
+- Tiene estado COMPLETADO.
+- Descuenta inventario si incluye productos.
+- Completa la cita si incluye una cita.
+- Registra un movimiento en auditoria.
+
+PAGO RECHAZADO O CANCELADO:
+- No genera factura.
+- No aparece como pago completado.
+- No descuenta inventario.
+- No completa la cita.
+- La orden PayPal queda FALLIDA o CANCELADA.
+

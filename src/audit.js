@@ -4,6 +4,7 @@ const ignoredPaths = [
   /^\/api\/usuarios\/login$/,
   /^\/api\/usuarios\/login\/otp$/,
   /^\/api\/usuarios\/recuperacion\//,
+  /^\/api\/banco-simulado\//,
   /^\/health$/,
 ];
 
@@ -34,6 +35,9 @@ const sensitiveFields = new Set([
   'correo',
   'telefono',
   'identificacion',
+  'numero_tarjeta',
+  'fecha_vencimiento',
+  'cvv',
 ]);
 
 // Debe coincidir EXACTAMENTE con el tamaño de la columna auditoria.movimiento
@@ -52,8 +56,8 @@ const getActorId = (req) => {
 };
 
 const getResourceName = (req) => {
-  const parts = req.path.split('/').filter(Boolean);
-  return parts[1] || parts[0] || 'recurso';
+  const parts = req.originalUrl.split('?')[0].split('/').filter(Boolean);
+  return parts[0] === 'api' ? parts[1] || 'recurso' : parts[0] || 'recurso';
 };
 
 const getResourceLabel = (resource) => resourceLabels[resource] || resource;
@@ -84,6 +88,16 @@ const summarizeBody = (body = {}, preferredFields = []) => {
 };
 
 const getActionDetail = (req, resource) => {
+  if (resource === 'pagos' && req.originalUrl.includes('/paypal/ordenes')) {
+    if (req.originalUrl.includes('/capturar')) {
+      return 'confirmó un pago con PayPal';
+    }
+    if (req.originalUrl.includes('/cancelar')) {
+      return 'canceló una orden de pago PayPal';
+    }
+    return `inició una orden de pago PayPal${summarizeBody(req.body, ['id_cita', 'monto'])}`;
+  }
+
   if (resource === 'citas' && req.path.endsWith('/estado')) {
     return `actualizó el estado de la cita ID ${req.params.id}${summarizeBody(req.body, ['estado'])}`;
   }

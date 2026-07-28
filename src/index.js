@@ -8,6 +8,8 @@ const citas = require('./routes/citas');
 const categoriasRouter = require('./routes/categorias');
 const productos = require('./routes/productos');
 const pagos = require('./routes/pagos');
+const paypal = require('./routes/paypal');
+const bancoSimulado = require('./routes/bancoSimulado');
 const autos = require('./routes/autos');
 const geografia = require('./routes/geografia');
 const auditMiddleware = require('./audit');
@@ -25,7 +27,9 @@ app.use('/api/servicios', servicios);
 app.use('/api/citas', citas);
 app.use('/api/categorias', categoriasRouter);
 app.use('/api/productos', productos);
+app.use('/api/pagos/paypal', paypal);
 app.use('/api/pagos', pagos);
+app.use('/api/banco-simulado', bancoSimulado);
 app.use('/api/autos', autos);
 app.use('/api/geografia', geografia);
 
