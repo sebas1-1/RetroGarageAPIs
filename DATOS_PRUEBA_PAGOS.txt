@@ -150,7 +150,10 @@ IMPORTANTE:
 - No usar la cuenta PayPal real.
 - No usar la cuenta Business para comprar.
 - La cuenta Personal compra y la Business recibe.
-- El total en colones se convierte a USD usando CRC 500 = USD 1.
+- El total en colones se convierte a USD con el tipo de cambio de
+  venta publicado por Hacienda/BCCR.
+- Si Hacienda no responde, el sistema utiliza temporalmente la tasa
+  de respaldo configurada en PAYPAL_CRC_PER_USD.
 
 Pasos:
 1. Seleccionar PayPal.
@@ -214,4 +217,3 @@ PAGO RECHAZADO O CANCELADO:
 - No descuenta inventario.
 - No completa la cita.
 - La orden PayPal queda FALLIDA o CANCELADA.
-

@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { getPool, sql } = require('../db');
 const {
+  ExchangeRateError,
+  getExchangeRate,
+} = require('../exchangeRateService');
+const {
   PayPalApiError,
   captureOrder,
   createOrder,
@@ -46,16 +50,8 @@ const observationsOrNull = (value) => {
   return normalized ? normalized.slice(0, 500) : null;
 };
 
-const getConversionConfig = () => {
-  const rate = Number(process.env.PAYPAL_CRC_PER_USD);
+const getConversionConfig = async () => {
   const currency = String(process.env.PAYPAL_CURRENCY || 'USD').toUpperCase();
-  if (!Number.isFinite(rate) || rate <= 0) {
-    throw new PayPalPaymentError(
-      500,
-      'La tasa de conversión de PayPal no está configurada.',
-      'PAYPAL_CONFIG_ERROR',
-    );
-  }
   if (currency !== 'USD') {
     throw new PayPalPaymentError(
       500,
@@ -63,7 +59,15 @@ const getConversionConfig = () => {
       'PAYPAL_CONFIG_ERROR',
     );
   }
-  return { rate, currency };
+  const exchangeRate = await getExchangeRate();
+  return {
+    rate: exchangeRate.venta,
+    buyRate: exchangeRate.compra,
+    rateDate: exchangeRate.fecha,
+    rateSource: exchangeRate.fuente,
+    isFallback: exchangeRate.es_respaldo,
+    currency,
+  };
 };
 
 const convertCrcToUsd = (amountCrc, rate) => {
@@ -110,6 +114,12 @@ const isFinalPayPalRejection = (error) => {
 };
 
 const sendError = (res, error) => {
+  if (error instanceof ExchangeRateError) {
+    return res.status(503).json({
+      error: 'No fue posible obtener el tipo de cambio.',
+      codigo: error.code,
+    });
+  }
   if (error instanceof PayPalPaymentError) {
     return res.status(error.status).json({
       error: error.message,
@@ -307,13 +317,30 @@ const markOrderAsFailed = async (pool, reference) => {
   }
 };
 
+router.get('/tipo-cambio', async (_req, res) => {
+  try {
+    const exchangeRate = await getExchangeRate();
+    return res.json({
+      moneda_origen: 'CRC',
+      moneda_destino: 'USD',
+      compra: exchangeRate.compra,
+      venta: exchangeRate.venta,
+      fecha: exchangeRate.fecha,
+      fuente: exchangeRate.fuente,
+      es_respaldo: exchangeRate.es_respaldo,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
 router.post('/ordenes', async (req, res) => {
   let transaction;
   let localReference = null;
   let pool;
 
   try {
-    const conversion = getConversionConfig();
+    const conversion = await getConversionConfig();
     pool = await getPool();
     transaction = new sql.Transaction(pool);
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
@@ -335,17 +362,30 @@ router.post('/ordenes', async (req, res) => {
       )
       .input('monto_crc', sql.Decimal(12, 2), purchase.totalAmount)
       .input('tasa_crc_usd', sql.Decimal(12, 4), conversion.rate)
+      .input(
+        'tasa_compra_crc_usd',
+        sql.Decimal(12, 4),
+        conversion.buyRate,
+      )
+      .input('tipo_cambio_fecha', sql.Date, conversion.rateDate)
+      .input(
+        'tipo_cambio_fuente',
+        sql.NVarChar(50),
+        conversion.rateSource,
+      )
       .input('monto_usd', sql.Decimal(12, 2), amountUsd)
       .input('moneda', sql.Char(3), conversion.currency)
       .input('observaciones', sql.NVarChar(500), purchase.observations)
       .query(`
         INSERT INTO ordenes_paypal
           (id_usuario, id_cita, id_metodo, monto_servicio_crc, monto_crc,
-           tasa_crc_usd, monto_usd, moneda, observaciones, estado)
+           tasa_crc_usd, tasa_compra_crc_usd, tipo_cambio_fecha,
+           tipo_cambio_fuente, monto_usd, moneda, observaciones, estado)
         OUTPUT INSERTED.id_orden, INSERTED.referencia_local
         VALUES
           (@id_usuario, @id_cita, @id_metodo, @monto_servicio_crc, @monto_crc,
-           @tasa_crc_usd, @monto_usd, @moneda, @observaciones, 'CREANDO')
+           @tasa_crc_usd, @tasa_compra_crc_usd, @tipo_cambio_fecha,
+           @tipo_cambio_fuente, @monto_usd, @moneda, @observaciones, 'CREANDO')
       `);
 
     const localOrder = orderResult.recordset[0];
@@ -424,6 +464,13 @@ router.post('/ordenes', async (req, res) => {
       monto_crc: purchase.totalAmount,
       monto_usd: amountUsd,
       moneda: conversion.currency,
+      tipo_cambio: {
+        compra: conversion.buyRate,
+        venta: conversion.rate,
+        fecha: conversion.rateDate,
+        fuente: conversion.rateSource,
+        es_respaldo: conversion.isFallback,
+      },
     });
   } catch (error) {
     await rollbackSafely(transaction);
