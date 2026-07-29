@@ -30,21 +30,14 @@ PAYPAL_CLIENT_ID=TU_CLIENT_ID_SANDBOX
 PAYPAL_CLIENT_SECRET=TU_SECRET_SANDBOX
 PAYPAL_CURRENCY=USD
 PAYPAL_CRC_PER_USD=500
-TIPO_CAMBIO_API_URL=https://api.hacienda.go.cr/indicadores/tc
-TIPO_CAMBIO_CACHE_MS=1800000
 PAYPAL_RETURN_URL=http://localhost:8081/pagos/paypal-retorno
 PAYPAL_CANCEL_URL=http://localhost:8081/pagos/paypal-retorno
 PAYPAL_SANDBOX_MOCK_ERROR=
 ```
 
 PayPal no procesa CRC en esta integración. El pago se conserva en colones en
-RetroGarage y se envía a PayPal en USD usando el indicador de venta obtenido
-desde Hacienda/BCCR. La respuesta se mantiene en caché durante 30 minutos.
-`PAYPAL_CRC_PER_USD` se utiliza únicamente como respaldo si el servicio externo
-no está disponible.
-
-Cada orden guarda la tasa de compra, tasa de venta, fecha y fuente utilizadas,
-por lo que una transacción histórica no cambia cuando se publica una tasa nueva.
+RetroGarage y se envía a PayPal en USD usando la tasa fija configurada en
+`PAYPAL_CRC_PER_USD`. La API de Hacienda no participa en el flujo PayPal.
 
 ### Probar fondos rechazados
 

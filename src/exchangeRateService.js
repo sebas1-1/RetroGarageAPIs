@@ -34,7 +34,7 @@ const asValidDate = (value) => {
 };
 
 const getFallbackRate = () => {
-  const rate = Number(process.env.PAYPAL_CRC_PER_USD);
+  const rate = Number(process.env.TIPO_CAMBIO_RESPALDO_CRC_USD);
   if (!Number.isFinite(rate) || rate <= 0) {
     throw new ExchangeRateError(
       'No existe un tipo de cambio de respaldo configurado.',

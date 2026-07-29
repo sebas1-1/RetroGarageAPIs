@@ -2,10 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { getPool, sql } = require('../db');
 const {
-  ExchangeRateError,
-  getExchangeRate,
-} = require('../exchangeRateService');
-const {
   PayPalApiError,
   captureOrder,
   createOrder,
@@ -50,8 +46,16 @@ const observationsOrNull = (value) => {
   return normalized ? normalized.slice(0, 500) : null;
 };
 
-const getConversionConfig = async () => {
+const getConversionConfig = () => {
+  const rate = Number(process.env.PAYPAL_CRC_PER_USD);
   const currency = String(process.env.PAYPAL_CURRENCY || 'USD').toUpperCase();
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new PayPalPaymentError(
+      500,
+      'La tasa de conversión de PayPal no está configurada.',
+      'PAYPAL_CONFIG_ERROR',
+    );
+  }
   if (currency !== 'USD') {
     throw new PayPalPaymentError(
       500,
@@ -59,13 +63,11 @@ const getConversionConfig = async () => {
       'PAYPAL_CONFIG_ERROR',
     );
   }
-  const exchangeRate = await getExchangeRate();
   return {
-    rate: exchangeRate.venta,
-    buyRate: exchangeRate.compra,
-    rateDate: exchangeRate.fecha,
-    rateSource: exchangeRate.fuente,
-    isFallback: exchangeRate.es_respaldo,
+    rate,
+    buyRate: null,
+    rateDate: null,
+    rateSource: 'CONFIGURACION_PAYPAL',
     currency,
   };
 };
@@ -114,12 +116,6 @@ const isFinalPayPalRejection = (error) => {
 };
 
 const sendError = (res, error) => {
-  if (error instanceof ExchangeRateError) {
-    return res.status(503).json({
-      error: 'No fue posible obtener el tipo de cambio.',
-      codigo: error.code,
-    });
-  }
   if (error instanceof PayPalPaymentError) {
     return res.status(error.status).json({
       error: error.message,
@@ -317,30 +313,13 @@ const markOrderAsFailed = async (pool, reference) => {
   }
 };
 
-router.get('/tipo-cambio', async (_req, res) => {
-  try {
-    const exchangeRate = await getExchangeRate();
-    return res.json({
-      moneda_origen: 'CRC',
-      moneda_destino: 'USD',
-      compra: exchangeRate.compra,
-      venta: exchangeRate.venta,
-      fecha: exchangeRate.fecha,
-      fuente: exchangeRate.fuente,
-      es_respaldo: exchangeRate.es_respaldo,
-    });
-  } catch (error) {
-    return sendError(res, error);
-  }
-});
-
 router.post('/ordenes', async (req, res) => {
   let transaction;
   let localReference = null;
   let pool;
 
   try {
-    const conversion = await getConversionConfig();
+    const conversion = getConversionConfig();
     pool = await getPool();
     transaction = new sql.Transaction(pool);
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
@@ -464,13 +443,6 @@ router.post('/ordenes', async (req, res) => {
       monto_crc: purchase.totalAmount,
       monto_usd: amountUsd,
       moneda: conversion.currency,
-      tipo_cambio: {
-        compra: conversion.buyRate,
-        venta: conversion.rate,
-        fecha: conversion.rateDate,
-        fuente: conversion.rateSource,
-        es_respaldo: conversion.isFallback,
-      },
     });
   } catch (error) {
     await rollbackSafely(transaction);

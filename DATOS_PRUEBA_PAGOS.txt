@@ -34,6 +34,8 @@ Resultado esperado:
 - Se descuenta el saldo de la tarjeta.
 - Si se compran productos, se descuenta el stock.
 - Si se paga una cita, la cita queda COMPLETADA.
+- Se muestra como referencia el equivalente en USD con la tasa
+  de venta de Hacienda/BCCR, pero el cobro se realiza en colones.
 
 
 ============================================================
@@ -102,6 +104,8 @@ Resultado esperado:
 - Se descuenta el saldo de la cuenta SINPE.
 - Se descuenta el stock cuando hay productos.
 - Se completa la cita cuando corresponde.
+- Se muestra como referencia el equivalente en USD con la tasa
+  de venta de Hacienda/BCCR, pero el cobro se realiza en colones.
 
 
 ============================================================
@@ -150,10 +154,9 @@ IMPORTANTE:
 - No usar la cuenta PayPal real.
 - No usar la cuenta Business para comprar.
 - La cuenta Personal compra y la Business recibe.
-- El total en colones se convierte a USD con el tipo de cambio de
-  venta publicado por Hacienda/BCCR.
-- Si Hacienda no responde, el sistema utiliza temporalmente la tasa
-  de respaldo configurada en PAYPAL_CRC_PER_USD.
+- El total en colones se convierte a USD usando la tasa fija
+  configurada en PAYPAL_CRC_PER_USD.
+- Con la configuracion actual: CRC 500 = USD 1.
 
 Pasos:
 1. Seleccionar PayPal.

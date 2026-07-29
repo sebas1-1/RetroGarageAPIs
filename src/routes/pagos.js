@@ -3,6 +3,10 @@ const express = require('express');
 const router = express.Router();
 const { getPool, sql } = require('../db');
 const {
+  ExchangeRateError,
+  getExchangeRate,
+} = require('../exchangeRateService');
+const {
   BankValidationError,
   createAuthorizationCode,
   hashCardCvv,
@@ -107,6 +111,33 @@ router.get('/metodos/lista', async (_req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al obtener métodos de pago' });
+  }
+});
+
+// Indicador informativo para pagos locales con Tarjeta y SINPE.
+router.get('/tipo-cambio', async (_req, res) => {
+  try {
+    const exchangeRate = await getExchangeRate();
+    return res.json({
+      moneda_origen: 'CRC',
+      moneda_destino: 'USD',
+      compra: exchangeRate.compra,
+      venta: exchangeRate.venta,
+      fecha: exchangeRate.fecha,
+      fuente: exchangeRate.fuente,
+      es_respaldo: exchangeRate.es_respaldo,
+    });
+  } catch (error) {
+    if (error instanceof ExchangeRateError) {
+      return res.status(503).json({
+        error: 'No fue posible obtener el tipo de cambio.',
+        codigo: error.code,
+      });
+    }
+    console.error(error);
+    return res.status(500).json({
+      error: 'Error al consultar el tipo de cambio.',
+    });
   }
 });
 

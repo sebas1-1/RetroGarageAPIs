@@ -57,9 +57,9 @@ test('reutiliza la respuesta almacenada en cache', async () => {
 });
 
 test('utiliza la tasa configurada si Hacienda no responde', async () => {
-  const previousRate = process.env.PAYPAL_CRC_PER_USD;
+  const previousRate = process.env.TIPO_CAMBIO_RESPALDO_CRC_USD;
   try {
-    process.env.PAYPAL_CRC_PER_USD = '500';
+    process.env.TIPO_CAMBIO_RESPALDO_CRC_USD = '500';
     const result = await getExchangeRate({
       fetchImpl: async () => {
         throw new Error('Sin conexión');
@@ -72,9 +72,9 @@ test('utiliza la tasa configurada si Hacienda no responde', async () => {
     assert.equal(result.es_respaldo, true);
   } finally {
     if (previousRate === undefined) {
-      delete process.env.PAYPAL_CRC_PER_USD;
+      delete process.env.TIPO_CAMBIO_RESPALDO_CRC_USD;
     } else {
-      process.env.PAYPAL_CRC_PER_USD = previousRate;
+      process.env.TIPO_CAMBIO_RESPALDO_CRC_USD = previousRate;
     }
   }
 });
