@@ -8,51 +8,64 @@ const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const getSecret = () =>
   process.env.DATA_ENCRYPTION_KEY || process.env.JWT_SECRET || FALLBACK_SECRET;
 
-const deriveKey = (purpose) =>
-  crypto.createHash('sha256').update(`${getSecret()}:${purpose}`).digest();
-
-const encryptionKey = deriveKey('field-encryption');
-const ivKey = deriveKey('field-iv');
-
-const buildIv = (fieldName, plaintext) =>
-  crypto
-    .createHmac('sha256', ivKey)
-    .update(`${fieldName}:${plaintext}`)
-    .digest()
-    .subarray(0, 12);
-
 const isEncrypted = (value) =>
   typeof value === 'string' && value.startsWith(ENCRYPTION_PREFIX);
 
-const encryptField = (fieldName, value) => {
-  if (value === null || value === undefined || value === '') return value || null;
-  if (isEncrypted(value)) return value;
+const createFieldCrypto = (secret) => {
+  if (!secret) throw new Error('La clave de cifrado es obligatoria.');
 
-  const text = String(value);
-  const iv = buildIv(fieldName, text);
-  const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv);
-  cipher.setAAD(Buffer.from(fieldName));
+  const deriveKey = (purpose) =>
+    crypto.createHash('sha256').update(`${secret}:${purpose}`).digest();
 
-  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
+  const encryptionKey = deriveKey('field-encryption');
+  const ivKey = deriveKey('field-iv');
 
-  return `${ENCRYPTION_PREFIX}${Buffer.concat([iv, tag, encrypted]).toString('base64')}`;
+  const buildIv = (fieldName, plaintext) =>
+    crypto
+      .createHmac('sha256', ivKey)
+      .update(`${fieldName}:${plaintext}`)
+      .digest()
+      .subarray(0, 12);
+
+  const encrypt = (fieldName, value) => {
+    if (value === null || value === undefined || value === '') return value || null;
+    if (isEncrypted(value)) return value;
+
+    const text = String(value);
+    const iv = buildIv(fieldName, text);
+    const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv);
+    cipher.setAAD(Buffer.from(fieldName));
+
+    const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+
+    return `${ENCRYPTION_PREFIX}${Buffer.concat([iv, tag, encrypted]).toString('base64')}`;
+  };
+
+  const decrypt = (fieldName, value) => {
+    if (value === null || value === undefined || value === '') return value || null;
+    if (!isEncrypted(value)) return value;
+
+    const payload = Buffer.from(value.slice(ENCRYPTION_PREFIX.length), 'base64');
+    const iv = payload.subarray(0, 12);
+    const tag = payload.subarray(12, 28);
+    const encrypted = payload.subarray(28);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey, iv);
+    decipher.setAAD(Buffer.from(fieldName));
+    decipher.setAuthTag(tag);
+
+    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+  };
+
+  return {
+    decryptField: decrypt,
+    encryptField: encrypt,
+  };
 };
 
-const decryptField = (fieldName, value) => {
-  if (value === null || value === undefined || value === '') return value || null;
-  if (!isEncrypted(value)) return value;
-
-  const payload = Buffer.from(value.slice(ENCRYPTION_PREFIX.length), 'base64');
-  const iv = payload.subarray(0, 12);
-  const tag = payload.subarray(12, 28);
-  const encrypted = payload.subarray(28);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey, iv);
-  decipher.setAAD(Buffer.from(fieldName));
-  decipher.setAuthTag(tag);
-
-  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
-};
+const fieldCrypto = createFieldCrypto(getSecret());
+const encryptField = fieldCrypto.encryptField;
+const decryptField = fieldCrypto.decryptField;
 
 const hashPassword = (password) => {
   const salt = crypto.randomBytes(16).toString('base64');
@@ -155,6 +168,7 @@ const buildOtpAuthUrl = ({ issuer = 'RetroGarage', account, secret }) => {
 
 module.exports = {
   buildOtpAuthUrl,
+  createFieldCrypto,
   decryptField,
   encryptField,
   generateOtpSecret,

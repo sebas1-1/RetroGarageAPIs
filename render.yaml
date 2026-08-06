@@ -1,0 +1,86 @@
+services:
+  - type: web
+    name: retrogarage-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /ready
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGINS
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: JSON_BODY_LIMIT
+        value: 100kb
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX
+        value: "300"
+      - key: AUTH_RATE_LIMIT_MAX
+        value: "20"
+      - key: DB_SERVER
+        sync: false
+      - key: DB_INSTANCE
+        sync: false
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_PORT
+        value: "1433"
+      - key: DB_ENCRYPT
+        sync: false
+      - key: DB_TRUST_SERVER_CERTIFICATE
+        sync: false
+      - key: DB_CONNECTION_TIMEOUT_MS
+        value: "15000"
+      - key: DB_REQUEST_TIMEOUT_MS
+        value: "30000"
+      - key: DB_POOL_MAX
+        value: "10"
+      - key: DB_POOL_MIN
+        value: "0"
+      - key: DB_POOL_IDLE_TIMEOUT_MS
+        value: "30000"
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_CURRENCY
+        value: USD
+      - key: PAYPAL_CRC_PER_USD
+        value: "500"
+      - key: PAYPAL_RETURN_URL
+        sync: false
+      - key: PAYPAL_CANCEL_URL
+        sync: false
+      - key: PAYPAL_SANDBOX_MOCK_ERROR
+        value: ""
+      - key: TIPO_CAMBIO_RESPALDO_CRC_USD
+        value: "500"
+      - key: TIPO_CAMBIO_API_URL
+        value: https://api.hacienda.go.cr/indicadores/tc
+      - key: TIPO_CAMBIO_CACHE_MS
+        value: "1800000"

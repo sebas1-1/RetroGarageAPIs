@@ -1,39 +1,80 @@
-require('dotenv').config();
-const express  = require('express');
-const cors     = require('cors');
-const clientes = require('./routes/clientes');
-const usuarios = require('./routes/usuarios');
-const servicios = require('./routes/servicios');
-const citas = require('./routes/citas');
-const categoriasRouter = require('./routes/categorias');
-const productos = require('./routes/productos');
-const pagos = require('./routes/pagos');
-const paypal = require('./routes/paypal');
-const bancoSimulado = require('./routes/bancoSimulado');
-const autos = require('./routes/autos');
-const geografia = require('./routes/geografia');
-const auditMiddleware = require('./audit');
+const { config, validateEnvironment } = require('./config');
 
+let server;
+let shuttingDown = false;
 
-const app = express();
+const shutdown = async (signal, exitCode = 0) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`Señal ${signal} recibida. Cerrando la API...`);
 
-app.use(cors());
-app.use(express.json());
-app.use(auditMiddleware);
+  const forceExit = setTimeout(() => {
+    console.error('Cierre forzado después de 15 segundos.');
+    process.exit(1);
+  }, 15000);
+  forceExit.unref();
 
-app.use('/api/clientes', clientes);
-app.use('/api/usuarios', usuarios);
-app.use('/api/servicios', servicios);
-app.use('/api/citas', citas);
-app.use('/api/categorias', categoriasRouter);
-app.use('/api/productos', productos);
-app.use('/api/pagos/paypal', paypal);
-app.use('/api/pagos', pagos);
-app.use('/api/banco-simulado', bancoSimulado);
-app.use('/api/autos', autos);
-app.use('/api/geografia', geografia);
+  if (server) {
+    await new Promise((resolve) => {
+      const closeActiveConnections = setTimeout(() => {
+        console.warn('Cerrando conexiones HTTP que permanecieron abiertas.');
+        server.closeAllConnections?.();
+      }, 5000);
+      closeActiveConnections.unref();
 
-app.get('/health', (_, res) => res.json({ ok: true }));
+      server.close((error) => {
+        clearTimeout(closeActiveConnections);
+        if (error) {
+          console.error('Error al cerrar el servidor HTTP:', error.message);
+          exitCode = 1;
+        }
+        resolve();
+      });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`API corriendo en http://localhost:${PORT}`));
+      server.closeIdleConnections?.();
+    });
+  }
+
+  try {
+    const { closePool } = require('./db');
+    await closePool();
+  } catch (error) {
+    console.error('Error al cerrar SQL Server:', error.message);
+    exitCode = 1;
+  } finally {
+    clearTimeout(forceExit);
+  }
+
+  console.log('API cerrada correctamente.');
+  process.exit(exitCode);
+};
+
+const start = async () => {
+  validateEnvironment();
+
+  const { getPool } = require('./db');
+  await getPool();
+
+  const app = require('./app');
+  server = app.listen(config.port, config.host, () => {
+    console.log(
+      `RetroGarage API iniciada en ${config.host}:${config.port} (${config.env}).`,
+    );
+  });
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (error) => {
+  console.error('Promesa no controlada:', error);
+  shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (error) => {
+  console.error('Excepción no controlada:', error);
+  shutdown('uncaughtException', 1);
+});
+
+start().catch((error) => {
+  console.error('No fue posible iniciar la API:', error.message);
+  process.exit(1);
+});
