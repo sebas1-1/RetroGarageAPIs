@@ -26,7 +26,7 @@ services:
       - key: DB_SERVER
         sync: false
       - key: DB_INSTANCE
-        sync: false
+        value: ""
       - key: DB_DATABASE
         sync: false
       - key: DB_USER
